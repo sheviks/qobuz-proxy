@@ -203,6 +203,15 @@ class WsManager:
 
     async def start(self) -> None:
         """Start WebSocket connection loop."""
+        if self._should_run or self._external_playback:
+            return
+
+        # A source takeover cancels the old connection. Finish its socket
+        # cleanup before opening a new one, including when the app immediately
+        # reselects this renderer with the same tokens.
+        if self._receive_task:
+            await asyncio.gather(self._receive_task, return_exceptions=True)
+
         if not self._ws_token or not self._ws_token.is_valid():
             logger.error("Cannot start WsManager: no valid tokens")
             return
@@ -237,14 +246,21 @@ class WsManager:
         return self._is_connected and self._active_confirmed and self._renderer_active
 
     def release_external_playback(self) -> None:
-        """Remain passive until discovery receives an explicit Qobuz selection."""
+        """Leave the cloud session so the app can select this renderer afresh."""
         self._external_playback = True
         self._renderer_active = False
-        self._active_confirmed = False
         self._activation_request = None
-        self._ownership_generation += 1
-        if self._on_disconnected:
-            self._on_disconnected()
+        self._should_run = False
+        self._invalidate_connection()
+        # Closing the real connection removes this renderer from the cloud
+        # session. Keeping it connected while ignoring commands leaves a dead
+        # output in the app, which then skips the discovery handshake on retry.
+        # The connection's async context manager closes its socket on cancel.
+        if self._receive_task:
+            self._receive_task.cancel()
+        logger.info(
+            "[%s] Left Qobuz session after external source takeover", self.config.device.name
+        )
 
     def _invalidate_connection(self) -> None:
         self._is_connected = False

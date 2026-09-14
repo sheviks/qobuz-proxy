@@ -404,6 +404,8 @@ class Speaker:
 
     async def _on_external_playback(self) -> None:
         """Release cloud ownership before ending the old Qobuz listening session."""
+        if self._discovery:
+            self._discovery.clear_session()
         if self._ws_manager:
             self._ws_manager.release_external_playback()
         if self._player:
@@ -419,10 +421,15 @@ class Speaker:
                 if isinstance(self._backend, DLNABackend):
                     await self._backend.check_external_playback()
                     self._backend.prepare_for_selection()
+                if self._discovery:
+                    # The source check above may have just released the old
+                    # session. This request is a new, explicit selection.
+                    self._discovery.set_session(tokens)
                 if self._ws_manager is not None:
                     # A discovery connect is an explicit selection, even when
                     # the same speaker already has an idle WebSocket.
                     self._ws_manager.set_tokens(tokens, activate=True)
+                    await self._ws_manager.start()
                     logger.info(f"[{self.name}] Refreshed WebSocket tokens from Qobuz app")
                     self._ws_connected_event.set()
                     return

@@ -126,6 +126,16 @@ class DiscoveryService:
         """Get tokens received from last connection request."""
         return self._received_tokens
 
+    def set_session(self, tokens: ConnectTokens) -> None:
+        """Record the session selected by the app."""
+        self._received_tokens = tokens
+        self._current_session_id = tokens.session_id
+
+    def clear_session(self) -> None:
+        """Require a fresh app handshake after releasing playback ownership."""
+        self._received_tokens = None
+        self._current_session_id = ""
+
     # -------------------------------------------------------------------------
     # HTTP Server
     # -------------------------------------------------------------------------
@@ -219,8 +229,7 @@ class DiscoveryService:
                 return web.json_response({"error": "Invalid tokens"}, status=400)
 
             # Store tokens
-            self._received_tokens = tokens
-            self._current_session_id = tokens.session_id
+            self.set_session(tokens)
 
             logger.info(f"Received connection from app (session: {tokens.session_id[:8]}...)")
 

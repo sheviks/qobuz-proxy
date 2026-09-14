@@ -432,12 +432,14 @@ class TestSpeakerWebSocket:
                 endpoint="wss://test.qobuz.com/ws",
             ),
         )
+        speaker._ws_manager.start = AsyncMock()
 
         with patch("qobuz_proxy.speaker.WsManager") as mock_ws_cls:
             await speaker._setup_websocket(tokens)
 
         # Should refresh tokens on existing manager, not create a new one
         speaker._ws_manager.set_tokens.assert_called_once_with(tokens, activate=True)
+        speaker._ws_manager.start.assert_awaited_once()
         mock_ws_cls.assert_not_called()
         assert speaker._ws_connected_event.is_set() is True
 

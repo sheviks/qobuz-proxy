@@ -13,10 +13,17 @@ commands and session snapshots without permanently releasing ownership.
 
 A confirmed foreign source releases Qobuz session ownership, invalidates pending
 playback commands, ends the Qobuz listening report, and discards local gapless
-state without editing the foreign queue. Background reconnects remain inactive;
-stale cloud activations cannot take control back. Select the speaker again in
-the Qobuz app to resume Qobuz playback. Source checks also protect shutdown from
-stopping another controller's audio.
+state without editing the foreign queue. Source checks also protect shutdown
+from stopping another controller's audio.
+
+The September 14 recovery fix also closes the old cloud connection and clears
+the discovery session after a takeover. Previously, the renderer stayed
+connected but silently ignored every command until another HTTP handshake;
+the app could keep selecting this unusable cloud renderer without sending that
+handshake. Closing it makes the app discover and connect to the speaker again.
+Token refresh alone cannot rejoin the released session or affect the other
+source. A new selection restarts the connection manager, waits for old socket
+cleanup, and restores playback and volume using the existing device UUID.
 
 `tests/integration/test_external_playback.py` exercises the real player, command
 handler, WebSocket protocol and speaker handoff with a simulated DLNA client.
@@ -24,6 +31,11 @@ It covers stopped/playing/paused reconnect snapshots, explicit reselection,
 gapless ownership, unknown URI recovery, external stops, delayed loads and
 renderer loading grace periods. These tests do not constitute live verification
 of the released build on a physical speaker.
+
+Recovery regression tests additionally use a real local WebSocket and HTTP
+discovery handshake to verify cloud disconnection, session clearing, same-token
+reselection, and playback/volume recovery. A delayed socket-close test covers
+reselection before teardown has finished.
 
 Validation: the full suite passed (713 tests), followed by all 17 takeover
 regression cases after adding the in-flight URI-read guard. A direct comparison

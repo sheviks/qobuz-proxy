@@ -772,3 +772,40 @@ class TestSessionOwnership:
         assert await task is False
         ws_manager._ws.send.assert_not_awaited()
         assert ws_manager._codec._msg_counter == counter
+
+
+async def test_reselection_waits_for_released_socket_cleanup(ws_manager, valid_tokens):
+    closing = asyncio.Event()
+    finish_close = asyncio.Event()
+    running = asyncio.Event()
+
+    async def old_connection():
+        running.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            closing.set()
+            await finish_close.wait()
+            ws_manager._invalidate_connection()
+            ws_manager._ws = None
+
+    ws_manager._should_run = True
+    ws_manager._receive_task = asyncio.create_task(old_connection())
+    await running.wait()
+    ws_manager.release_external_playback()
+    await closing.wait()
+    ws_manager.set_tokens(valid_tokens, activate=True)
+    ws_manager._connection_loop = AsyncMock()
+    restarting = asyncio.create_task(ws_manager.start())
+    try:
+        await asyncio.sleep(0)
+        assert not restarting.done()
+        ws_manager._connection_loop.assert_not_awaited()
+        finish_close.set()
+        await asyncio.wait_for(restarting, 1)
+        await asyncio.sleep(0)
+        ws_manager._connection_loop.assert_awaited_once()
+        assert ws_manager._activation_request is not None
+    finally:
+        finish_close.set()
+        await ws_manager.stop()

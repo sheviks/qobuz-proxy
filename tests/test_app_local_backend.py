@@ -109,6 +109,7 @@ class TestSpeakerLocalBackend:
         speaker._queue = MagicMock()
         speaker._player = MagicMock()
         speaker._ws_manager = MagicMock()
+        speaker._ws_manager.start = AsyncMock()
 
         tokens = ConnectTokens(
             session_id=str(uuid.uuid4()),
