@@ -291,7 +291,10 @@ class DiscoveryService:
             properties=properties,
         )
 
-        self._zeroconf = Zeroconf()
+        # Register on the same interface we advertise. Joining every Docker
+        # bridge can exhaust Linux's multicast membership limit before the LAN
+        # interface is reached, leaving the speaker intermittently undiscoverable.
+        self._zeroconf = Zeroconf(interfaces=[local_ip])
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(None, self._zeroconf.register_service, self._service_info)

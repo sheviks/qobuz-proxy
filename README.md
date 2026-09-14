@@ -145,6 +145,10 @@ If you cannot use host networking, consider:
 - Using a macvlan network with a dedicated IP on your LAN
 - Running QobuzProxy directly on the host (not in Docker)
 
+QobuzProxy registers discovery on the interface whose IPv4 address it advertises.
+It does not join multicast groups on every Docker bridge, so hosts with many
+containers do not need a higher multicast membership limit for Qobuz discovery.
+
 ### Configuration
 
 The config file is found automatically in this order:
